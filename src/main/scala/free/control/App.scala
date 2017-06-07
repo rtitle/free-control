@@ -3,13 +3,12 @@ package free.control
 import cats.data.Coproduct
 import cats.free.Free
 import cats.{Id, ~>}
-import free.control.ControlFlow._
 
 object App {
 
   type FunApp[A] = Coproduct[CounterA, ControlFlowA, A]
 
-  def program(implicit C: Counter[FunApp], F: ControlFlow[FunApp]): Free[FunApp, (Int, Int, Int)] = {
+  def program(implicit C: Counter[FunApp], F: ControlFlow[FunApp]): Free[FunApp, (Int, Int, Int, Int, Int)] = {
     import C._, F._
 
     for {
@@ -30,11 +29,16 @@ object App {
       _ <- set(1)
       _ <- whileF(get.map(_ < 100))(mult(2))
       z <- get
-    } yield (x, y, z) // should be (15, 0, 128)
+      _ <- pushScope
+      _ <-   set(42)
+      s <-   get
+      _ <- popScope
+      ss <- get
+    } yield (x, y, z, s, ss) // should be (15, 0, 128, 42, 128)
   }
 
-  val interpreter: FunApp ~> Id = Counter.Interpreter or ControlFlow.Interpreter
+  def interpreter: FunApp ~> Id = Counter.interpreter[Id] or ControlFlow.interpreter[Id]
+  val scopedInterpreter: FunApp ~> Id = ControlFlow.scopedInterpreter(interpreter)
 
-  def run = program.foldMap(interpreter)
-
+  def run = program.foldMap(scopedInterpreter)
 }
