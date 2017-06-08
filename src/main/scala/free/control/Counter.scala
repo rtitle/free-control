@@ -1,7 +1,7 @@
 package free.control 
 
 import cats.free.{Free, Inject}
-import cats.{Monad, ~>}
+import cats.{Id, ~>}
 import free.control.CounterA._
 
 sealed trait CounterA[A]
@@ -25,26 +25,26 @@ class Counter[F[_]](implicit I: Inject[CounterA, F]) {
 object Counter {
   implicit def counter[F[_]](implicit I: Inject[CounterA, F]): Counter[F] = new Counter[F]
 
-  def interpreter[G[_]: Monad]: CounterA ~> G = new Interpreter[G]
+  def interpreter: CounterA ~> Id = new Interpreter
 
-  private class Interpreter[G[_]](implicit M: Monad[G]) extends (CounterA ~> G) {
+  private class Interpreter extends (CounterA ~> Id) {
     var curN: Int = _
 
-    def apply[A](fa: CounterA[A]): G[A] = fa match {
+    def apply[A](fa: CounterA[A]): Id[A] = fa match {
       case Set(n) =>
         curN = n
-        M.pure(())
+        ()
       case Add(n) =>
         curN = curN + n
-        M.pure(())
+        ()
       case Subtract(n) =>
         curN = curN - n
-        M.pure(())
+        ()
       case Get =>
-        M.pure(curN)
+        curN
       case Reset =>
         curN = 0
-        M.pure(())
+        ()
     }
   }
 }

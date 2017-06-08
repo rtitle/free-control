@@ -9,36 +9,53 @@ import free.control.ControlFlowA._
 sealed trait ControlFlowA[A]
 
 object ControlFlowA {
-  final case class Def[F[_], A, B](fn: A => Free[F, B]) extends ControlFlowA[A => Free[F, B]]
-  final case object Stay extends ControlFlowA[Unit]
-  final case object PushScope extends ControlFlowA[Unit]
-  final case object PopScope extends ControlFlowA[Unit]
+  private[control] final case class Function0[F[_], A](fn: () => Free[F, A]) extends ControlFlowA[() => Free[F, A]]
+  private[control] final case class Function1[F[_], A, B](fn: A => Free[F, B]) extends ControlFlowA[A => Free[F, B]]
+  private[control] final case class Function2[F[_], A, B, C](fn: (A, B) => Free[F, C]) extends ControlFlowA[(A, B) => Free[F, C]]
+  private[control] final case class Function3[F[_], A, B, C, D](fn: (A, B, C) => Free[F, D]) extends ControlFlowA[(A, B, C) => Free[F, D]]
+  // that's enough for now
+
+  private[control] final case object Stay extends ControlFlowA[Unit]
+  
+  private[control] final case object PushScope extends ControlFlowA[Unit]
+  private[control] final case object PopScope extends ControlFlowA[Unit]
 }
 
 class ControlFlow[F[_]](implicit I: Inject[ControlFlowA, F]) {
-  def defF[A, B](body: A => Free[F, B]): Free[F, A => Free[F, B]] =
-    Free.inject[ControlFlowA, F](Def[F, A, B](body))
 
-  def pushScope: Free[F, Unit] = Free.inject[ControlFlowA, F](PushScope)
+  def function0F[A](body: () => Free[F, A]): Free[F, () => Free[F, A]] =
+    Free.inject[ControlFlowA, F](Function0(body))
 
-  def popScope: Free[F, Unit] = Free.inject[ControlFlowA, F](PopScope)
+  def function1F[A, B](body: A => Free[F, B]): Free[F, A => Free[F, B]] =
+    Free.inject[ControlFlowA, F](Function1(body))
+
+  def function2F[A, B, C](body: (A, B) => Free[F, C]): Free[F, (A, B) => Free[F, C]] =
+    Free.inject[ControlFlowA, F](Function2(body))
+
+  def function3F[A, B, C, D](body: (A, B, C) => Free[F, D]): Free[F, (A, B, C) => Free[F, D]] =
+    Free.inject[ControlFlowA, F](Function3(body))
+
+  def pushScopeF: Free[F, Unit] = Free.inject[ControlFlowA, F](PushScope)
+
+  def popScopeF: Free[F, Unit] = Free.inject[ControlFlowA, F](PopScope)
 
   def stayF: Free[F, Unit] = Free.inject[ControlFlowA, F](Stay)
 
-  def repeatF[A](n: Int)(fn: Free[F, A]): Free[F, Unit] = {
+  def repeatF[A](n: Int)(fn: Free[F, A]): Free[F, Unit] =
+    repeatWithIndexF(n)(_ => fn)
+
+  def repeatWithIndexF[A](n: Int)(fn: Int => Free[F, A]): Free[F, Unit] = {
     def inner(c: Int): Free[F, Unit] = {
-      if (c <= 0) stayF
-      else fn.flatMap(_ => inner(c - 1))
+      if (c == n) stayF
+      else fn(c).flatMap(_ => inner(c - 1))
     }
-    inner(n - 1)
+    inner(0)
   }
 
   def whileF[A](cond: => Free[F, Boolean])(fn: Free[F, A]): Free[F, Unit] = {
-    def inner: Free[F, Unit] = {
-      cond.flatMap {
-        case true => fn.flatMap(_ => inner)
-        case false => stayF
-      }
+    def inner: Free[F, Unit] = cond.flatMap {
+      case true => fn.flatMap(_ => inner)
+      case false => stayF
     }
     inner
   }
@@ -71,7 +88,13 @@ object ControlFlow {
 
   private class Interpreter[G[_]](implicit M: Monad[G]) extends (ControlFlowA ~> G) {
     def apply[A](fa: ControlFlowA[A]): G[A] = fa match {
-      case Def(fn) =>
+      case Function0(fn) =>
+        M.pure(fn)
+      case Function1(fn) =>
+        M.pure(fn)
+      case Function2(fn) =>
+        M.pure(fn)
+      case Function3(fn) =>
         M.pure(fn)
       case Stay =>
         M.pure(())

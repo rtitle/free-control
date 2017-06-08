@@ -12,7 +12,7 @@ object App {
     import C._, F._
 
     for {
-      mult <- defF((x: Int) =>
+      mult <- function1F((x: Int) =>
         for {
           a <- get
           _ <- condF_(
@@ -29,15 +29,15 @@ object App {
       _ <- set(1)
       _ <- whileF(get.map(_ < 100))(mult(2))
       z <- get
-      _ <- pushScope
+      _ <- pushScopeF
       _ <-   set(42)
       s <-   get
-      _ <- popScope
+      _ <- popScopeF
       ss <- get
     } yield (x, y, z, s, ss) // should be (15, 0, 128, 42, 128)
   }
 
-  def interpreter: FunApp ~> Id = Counter.interpreter[Id] or ControlFlow.interpreter[Id]
+  def interpreter: FunApp ~> Id = Counter.interpreter or ControlFlow.interpreter[Id]
   val scopedInterpreter: FunApp ~> Id = ControlFlow.scopedInterpreter(interpreter)
 
   def run = program.foldMap(scopedInterpreter)
