@@ -39,6 +39,7 @@ object App {
 
   def interpreter: FunApp ~> Id = Counter.interpreter or ControlFlow.interpreter[Id]
   val scopedInterpreter: FunApp ~> Id = ControlFlow.scopedInterpreter(interpreter)
+  val gotoInterpreter: FunApp ~> Id = ControlFlow.gotoInterpreter(scopedInterpreter)
 
-  def run = program.foldMap(scopedInterpreter)
+  def run = program.foldMap(gotoInterpreter)
 }

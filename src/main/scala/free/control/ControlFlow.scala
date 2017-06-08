@@ -16,9 +16,12 @@ object ControlFlowA {
   // that's enough for now
 
   private[control] final case object Stay extends ControlFlowA[Unit]
-  
+
   private[control] final case object PushScope extends ControlFlowA[Unit]
   private[control] final case object PopScope extends ControlFlowA[Unit]
+
+  private[control] final case class Label(lbl: String) extends ControlFlowA[Unit]
+  private[control] final case class Goto(lbl: String) extends ControlFlowA[Unit]
 }
 
 class ControlFlow[F[_]](implicit I: Inject[ControlFlowA, F]) {
@@ -40,6 +43,10 @@ class ControlFlow[F[_]](implicit I: Inject[ControlFlowA, F]) {
   def popScopeF: Free[F, Unit] = Free.inject[ControlFlowA, F](PopScope)
 
   def stayF: Free[F, Unit] = Free.inject[ControlFlowA, F](Stay)
+
+  def labelF(lbl: String): Free[F, Unit] = Free.inject[ControlFlowA, F](Label(lbl))
+
+  def gotoF(lbl: String): Free[F, Unit] = Free.inject[ControlFlowA, F](Goto(lbl))
 
   def repeatF[A](n: Int)(fn: Free[F, A]): Free[F, Unit] =
     repeatWithIndexF(n)(_ => fn)
@@ -86,6 +93,9 @@ object ControlFlow {
   def scopedInterpreter[F[_], G[_]: Monad](wrapped: => ControlFlowApp[F, ?] ~> G): ControlFlowApp[F, ?] ~> G =
     new ScopedInterpreter[F, G](wrapped)
 
+  def gotoInterpreter[F[_], G[_]: Monad](wrapped: ControlFlowApp[F, ?] ~> G): ControlFlowApp[F, ?] ~> G =
+    new GotoInterpreter[F, G](wrapped)
+
   private class Interpreter[G[_]](implicit M: Monad[G]) extends (ControlFlowA ~> G) {
     def apply[A](fa: ControlFlowA[A]): G[A] = fa match {
       case Function0(fn) =>
@@ -101,6 +111,10 @@ object ControlFlow {
       case PushScope =>
         M.pure(())
       case PopScope =>
+        M.pure(())
+      case Label(_) =>
+        M.pure(())
+      case Goto(_) =>
         M.pure(())
     }
   }
@@ -119,6 +133,32 @@ object ControlFlow {
           stack.head.apply(fa)
         case _ => stack.head.apply(fa)
       }
+    }
+  }
+
+  private class GotoInterpreter[F[_], G[_]](wrapped: ControlFlowApp[F, ?] ~> G)(implicit M: Monad[G]) extends (ControlFlowApp[F, ?] ~> G) {
+    var program: Free[ControlFlowApp[F, ?], Any] = Free.pure[ControlFlowApp[F, ?], Any](Coproduct.rightc(Stay))
+    var labels: Map[String, Free[ControlFlowApp[F, ?], _]] = Map.empty
+
+    override def apply[A](fa: ControlFlowApp[F, A]): G[A] = {
+      fa.run match {
+        case Right(rfa) =>
+          val step = Free.liftF[ControlFlowApp[F, ?], A](Coproduct.rightc(rfa))
+          // If Free were covariant on type A I wouldn't have to cast to Any
+          program = program.flatMap(_ => step.asInstanceOf[Free[ControlFlowApp[F, ?], Any]])
+
+          rfa match {
+            case Label(lbl) => labels = labels + (lbl -> step)
+            case Goto(lbl) => labels.get(lbl).foreach(_.foldMap(this))
+            case _ =>
+          }
+
+        case Left(lfa) =>
+          val step = Free.liftF[ControlFlowApp[F, ?], A](Coproduct.leftc(lfa))
+          // If Free were covariant on type A I wouldn't have to cast to Any
+          program = program.flatMap(_ => step.asInstanceOf[Free[ControlFlowApp[F, ?], Any]])
+      }
+      wrapped.apply(fa)
     }
   }
 }
