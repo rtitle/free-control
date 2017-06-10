@@ -4,6 +4,7 @@ import cats.data.Coproduct
 import cats.free.{Free, Inject}
 import cats.syntax.either._
 import cats.{Monad, ~>}
+import free.control.ControlFlow.Interpreter
 import free.control.ControlFlowA._
 
 sealed trait ControlFlowA[A]
@@ -38,6 +39,8 @@ class ControlFlow[F[_]](implicit I: Inject[ControlFlowA, F]) {
   def function3F[A, B, C, D](body: (A, B, C) => Free[F, D]): Free[F, (A, B, C) => Free[F, D]] =
     Free.inject[ControlFlowA, F](Function3(body))
 
+  // TODO: implement fixF0,1,2,3 for recursion
+
   def pushScopeF: Free[F, Unit] = Free.inject[ControlFlowA, F](PushScope)
 
   def popScopeF: Free[F, Unit] = Free.inject[ControlFlowA, F](PopScope)
@@ -53,8 +56,8 @@ class ControlFlow[F[_]](implicit I: Inject[ControlFlowA, F]) {
 
   def repeatWithIndexF[A](n: Int)(fn: Int => Free[F, A]): Free[F, Unit] = {
     def inner(c: Int): Free[F, Unit] = {
-      if (c == n) stayF
-      else fn(c).flatMap(_ => inner(c - 1))
+      if (c == n - 1) stayF
+      else fn(c).flatMap(_ => inner(c + 1))
     }
     inner(0)
   }
@@ -90,48 +93,62 @@ object ControlFlow {
 
   def interpreter[G[_]: Monad]: ControlFlowA ~> G = new Interpreter[G]
 
-  def scopedInterpreter[F[_], G[_]: Monad](wrapped: => ControlFlowApp[F, ?] ~> G): ControlFlowApp[F, ?] ~> G =
-    new ScopedInterpreter[F, G](wrapped)
+  def scopedInterpreter[F[_], G[_]: Monad, I <: F ~> G](initial: I, copy: I => I): ControlFlowApp[F, ?] ~> G =
+    new ScopedInterpreter[F, G, I](initial, copy)
 
   def gotoInterpreter[F[_], G[_]: Monad](wrapped: ControlFlowApp[F, ?] ~> G): ControlFlowApp[F, ?] ~> G =
     new GotoInterpreter[F, G](wrapped)
 
-  private class Interpreter[G[_]](implicit M: Monad[G]) extends (ControlFlowA ~> G) {
+  private[control] class Interpreter[G[_]](implicit M: Monad[G]) extends (ControlFlowA ~> G) {
+
     def apply[A](fa: ControlFlowA[A]): G[A] = fa match {
       case Function0(fn) =>
         M.pure(fn)
+
       case Function1(fn) =>
         M.pure(fn)
+
       case Function2(fn) =>
         M.pure(fn)
+
       case Function3(fn) =>
         M.pure(fn)
+
       case Stay =>
         M.pure(())
+
       case PushScope =>
         M.pure(())
+
       case PopScope =>
         M.pure(())
+
       case Label(_) =>
         M.pure(())
+
       case Goto(_) =>
         M.pure(())
     }
   }
 
-  private class ScopedInterpreter[F[_], G[_]](wrapped: => ControlFlowApp[F, ?] ~> G)(implicit M: Monad[G]) extends (ControlFlowApp[F, ?] ~> G) {
-    var stack: List[ControlFlowApp[F, ?] ~> G] = List(wrapped)
+  private class ScopedInterpreter[F[_], G[_], I <: F ~> G](initial: I, copy: I => I)(implicit M: Monad[G]) extends (ControlFlowApp[F, ?] ~> G) {
+    var stack: List[I] = List(initial)
 
     override def apply[A](fa: ControlFlowApp[F, A]): G[A] = {
       fa.run match {
         case Right(PushScope) =>
-          val newInterpreter = wrapped
-          stack = newInterpreter :: stack
-          newInterpreter.apply(fa)
+          stack = stack match {
+            case h :: t => copy(h) :: h :: t
+            case _ => stack
+          }
+          M.pure(())
         case Right(PopScope) =>
-          stack = stack.drop(1)
-          stack.head.apply(fa)
-        case _ => stack.head.apply(fa)
+          stack = stack match {
+            case _ :: t => t
+            case _ => stack
+          }
+          M.pure(())
+        case _ => (stack.head or interpreter[G]).apply(fa)
       }
     }
   }
@@ -148,8 +165,11 @@ object ControlFlow {
           program = program.flatMap(_ => step.asInstanceOf[Free[ControlFlowApp[F, ?], Any]])
 
           rfa match {
-            case Label(lbl) => labels = labels + (lbl -> step)
-            case Goto(lbl) => labels.get(lbl).foreach(_.foldMap(this))
+            case Label(lbl) =>
+              // TODO bug here: the step doesn't reference the entire program so goto doesn't work
+              labels = labels + (lbl -> step)
+            case Goto(lbl) =>
+              labels.get(lbl).foreach(_.foldMap(this))
             case _ =>
           }
 

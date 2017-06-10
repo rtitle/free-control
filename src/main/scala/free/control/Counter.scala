@@ -25,9 +25,9 @@ class Counter[F[_]](implicit I: Inject[CounterA, F]) {
 object Counter {
   implicit def counter[F[_]](implicit I: Inject[CounterA, F]): Counter[F] = new Counter[F]
 
-  def interpreter: CounterA ~> Id = new Interpreter
+  def interpreter: Interpreter = new Interpreter
 
-  private class Interpreter extends (CounterA ~> Id) {
+  class Interpreter extends (CounterA ~> Id) {
     var curN: Int = _
 
     def apply[A](fa: CounterA[A]): Id[A] = fa match {
@@ -45,6 +45,14 @@ object Counter {
       case Reset =>
         curN = 0
         ()
+    }
+  }
+
+  object Interpreter {
+    def copy: Interpreter => Interpreter = i => {
+      val res = new Interpreter
+      res.curN = i.curN
+      res
     }
   }
 }
