@@ -73,13 +73,14 @@ object ControlFlow {
   implicit def controlFlow[F[_]](implicit I: Inject[ControlFlowA, F]): ControlFlow[F] = new ControlFlow[F]
 
   type ControlFlowApp[F[_], A] = Coproduct[F, ControlFlowA, A]
+  type FreeControlFlowApp[F[_], A] = Free[ControlFlowApp[F, ?], A]
 
   def interpreter[F[_], G[_]: Monad, I <: F ~> G](initial: I, copy: I => I): ControlFlowApp[F, ?] ~> G =
     new Interpreter[F, G, I](initial, copy)
 
   private[control] class Interpreter[F[_], G[_], I <: F ~> G](initial: I, copy: I => I)(implicit M: Monad[G]) extends (ControlFlowApp[F, ?] ~> G) {
     var stack: List[I] = List(initial)
-    var labels: Map[String, Free[ControlFlowApp[F, ?], _]] = Map.empty
+    var labels: Map[String, FreeControlFlowApp[F, _]] = Map.empty
 
     override def apply[A](fa: ControlFlowApp[F, A]): G[A] = {
       fa.run match {
@@ -101,16 +102,16 @@ object ControlFlow {
             case Const(a) => M.pure(a)
 
             case Cond(conds, otherwise) =>
-              val unsafe = condF(conds.asInstanceOf[List[(Free[ControlFlowApp[F, ?], Boolean], Free[ControlFlowApp[F, ?], A])]], otherwise.asInstanceOf[Free[ControlFlowApp[F, ?], A]])
-              unsafe.foldMap(this)
+              val unsafeConds = conds.map { case (a, b) => unsafe[Boolean](a) -> unsafe[A](b) }
+              val unsafeOtherwise = unsafe[A](otherwise)
+              condF(unsafeConds, unsafeOtherwise).foldMap(this)
 
             case While(cond, fn) =>
-              val unsafe = whileF(cond.asInstanceOf[Free[ControlFlowApp[F, ?], Boolean]], fn.asInstanceOf[Free[ControlFlowApp[F, ?], Unit]])
-              unsafe.foldMap(this)
+              whileF(unsafe[Boolean](cond), unsafe[Unit](fn)).foldMap(this)
 
             case RepeatWithIndex(n, fn) =>
-              val unsafe = repeatWithIndexF(n.asInstanceOf[Free[ControlFlowApp[F, ?], Int]], fn.asInstanceOf[Int => Free[ControlFlowApp[F, ?], A]])
-              unsafe.foldMap(this)
+              val unsafeFn = fn.asInstanceOf[Int => FreeControlFlowApp[F, A]]
+              repeatWithIndexF(unsafe[Int](n), unsafeFn).foldMap(this)
 
             case PushScope =>
               stack = stack match {
@@ -118,6 +119,7 @@ object ControlFlow {
                 case _ => stack
               }
               M.pure(())
+
             case PopScope =>
               stack = stack match {
                 case _ :: t => t
@@ -138,8 +140,8 @@ object ControlFlow {
       }
     }
 
-    private def condF[A](condsF: List[(Free[ControlFlowApp[F, ?], Boolean], Free[ControlFlowApp[F, ?], A])], otherwise: Free[ControlFlowApp[F, ?], A]): Free[ControlFlowApp[F, ?], A] = {
-      def inner(cs: List[(Free[ControlFlowApp[F, ?], Boolean], Free[ControlFlowApp[F, ?], A])]): Free[ControlFlowApp[F, ?], A] = cs match {
+    private def condF[A](condsF: List[(FreeControlFlowApp[F, Boolean], FreeControlFlowApp[F, A])], otherwise: FreeControlFlowApp[F, A]): FreeControlFlowApp[F, A] = {
+      def inner(cs: List[(FreeControlFlowApp[F, Boolean], FreeControlFlowApp[F, A])]): FreeControlFlowApp[F, A] = cs match {
         case Nil => otherwise
         case (cond, fn) :: t => cond.flatMap {
           case true => fn
@@ -149,22 +151,24 @@ object ControlFlow {
       inner(condsF)
     }
 
-    private def whileF[A](condF: Free[ControlFlowApp[F, ?], Boolean], fn: Free[ControlFlowApp[F, ?], A]): Free[ControlFlowApp[F, ?], Unit] = {
-      def inner: Free[ControlFlowApp[F, ?], Unit] = condF.flatMap {
+    private def whileF[A](condF: FreeControlFlowApp[F, Boolean], fn: FreeControlFlowApp[F, A]): FreeControlFlowApp[F, Unit] = {
+      def inner: FreeControlFlowApp[F, Unit] = condF.flatMap {
         case true => fn.flatMap(_ => inner)
-        case false =>  Free.liftF[ControlFlowApp[F, ?], Unit](Coproduct.rightc(Stay))
+        case false => Free.liftF[ControlFlowApp[F, ?], Unit](Coproduct.rightc(Stay))
       }
       inner
     }
 
-    private def repeatWithIndexF[A](n: Free[ControlFlowApp[F, ?], Int], fn: Int => Free[ControlFlowApp[F, ?], A]): Free[ControlFlowApp[F, ?], Unit] = {
+    private def repeatWithIndexF[A](n: FreeControlFlowApp[F, Int], fn: Int => FreeControlFlowApp[F, A]): FreeControlFlowApp[F, Unit] = {
       n.flatMap { nn =>
-        def inner(c: Int): Free[ControlFlowApp[F, ?], Unit] = {
+        def inner(c: Int): FreeControlFlowApp[F, Unit] = {
           if (c == nn - 1) Free.liftF[ControlFlowApp[F, ?], Unit](Coproduct.rightc(Stay))
           else fn(c).flatMap(_ => inner(c + 1))
         }
         inner(0)
       }
     }
+
+    private def unsafe[AA](fa: Free[Any, _]): FreeControlFlowApp[F, AA] = fa.asInstanceOf[FreeControlFlowApp[F, AA]]
   }
 }
