@@ -15,10 +15,10 @@ object App {
       mult <- function1F[Int, Unit] { x =>
         for {
           a <- get
-          _ <- condF_(
-            (x == 0) -> reset,
-            (x == 1) -> stayF)(
-            otherwise = repeatF(x)(add(a)))
+          _ <- condF(
+            constF(x == 0) -> reset,
+            constF(x == 1) -> stayF)(
+            otherwise = repeatF(constF(x))(add(a)))
         } yield ()
       }
       _ <- set(5)
@@ -37,15 +37,12 @@ object App {
       ss <- get
       _ <- labelF("label")
       _ <- add(-1)
-      a <- get
-      _ <- condF_((a > 10) -> gotoF("label"))(otherwise = stayF)
+      _ <- condF(get.map(_ > 10) -> gotoF("label"))(otherwise = stayF)
       last <- get
     } yield (x, y, z, s, ss, last) // should be (15, 0, 128, 42, 128, 10)
   }
 
-  //def interpreter: FunApp ~> Id = Counter.interpreter or ControlFlow.interpreter[Id]
-  val scopedInterpreter: FunApp ~> Id = ControlFlow.scopedInterpreter(Counter.interpreter, Counter.Interpreter.copy)
-  val gotoInterpreter: FunApp ~> Id = ControlFlow.gotoInterpreter(scopedInterpreter)
+  def interpreter: FunApp ~> Id = ControlFlow.interpreter(Counter.interpreter, Counter.Interpreter.copy)
 
-  def run = program.foldMap(gotoInterpreter)
+  def run = program.foldMap(interpreter)
 }
