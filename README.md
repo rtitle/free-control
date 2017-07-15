@@ -32,13 +32,13 @@ Here is a tour of the supported features. All of this code (and more) is tested 
 For the below examples, assume we have a `Counter` free monad with the following algebra:
 ```
 sealed trait CounterA[A]
-// Stores a value in current state
+// Sets the current value
 final case class Set(n: Int) extends CounterA[Unit]
 // Adds a value to the currently stored value
 final case class Add(n: Int) extends CounterA[Unit]
 // Gets the currently stored value
 final case object Get extends CounterA[Int]
-// Same a Set(0)
+// Sets the current value to 0
 final case object Reset extends CounterA[Unit]
 ```
 Note there is state associated with this algebra: it stores a single `Int` value.
