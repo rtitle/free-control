@@ -23,7 +23,6 @@ val interpreter: MyApp ~> Id = ControlFlowInterpreter(MyInterpreter)
 
 // Run it!
 program.foldMap(interpreter)
-
 ```
 
 ## Features
