@@ -10,6 +10,7 @@ The control flow algebra can be composed into an existing free algebra as descri
 For example, assuming an existing `MyAlgebra` and `MyInterpreter`:
 ```
 import control.free._
+
 type MyApp[A] = ControlFlowAppp[MyAlegbra, A]
 
 def program(implicit A: MyAlegbra[MyApp], C: ControlFlow[MyApp]): Free[MyApp, ???] = {
@@ -53,8 +54,8 @@ for {
 ```
 
 ### Repeat loops
-```
 Repeats an action `n` times.
+```
 for {
   _ <- repeatF(constF(100)) {
     add(1)
