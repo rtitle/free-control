@@ -46,9 +46,12 @@ Note there is state associated with this algebra: it stores a single `Int` value
 Now let's see what we can do with our control flow structures.
 
 ### While loops
+Loops while a condition is true.
 ```
 for {
-  _ <- whileF(get.map(_ < 100))(add(1))
+  _ <- whileF(get.map(_ < 100)) {
+    add(1)
+  }
   res <- get
 } yield res
 // returns 100
@@ -56,15 +59,18 @@ for {
 
 ### Repeat loops
 ```
+Repeats an action `n` times.
 for {
-  _ <- repeatF(constF(100))(add(1))
+  _ <- repeatF(constF(100)) {
+    add(1)
+  }
   res <- get
 } yield res
 // returns 100
 ```
 
 ### Conditionals
-Conditionals are specified by calling `condF` with multiple cases, followed by the otherwise case.
+Conditionals are specified by calling `condF` with multiple cases, followed by the otherwise case. The first case which evaluates to true is executed, and no further cases are executed.
 ```
 for {
   _ <- set(5)
@@ -98,17 +104,17 @@ for {
 ```
 
 ### Scope
-If your free monad contains state, we can control the scope.
+If your free monad contains state (as is the case with our counter), we can control state changes with scope. Note when you push a scope, that scope has access to state in its parent scope, but any state changes are local to the child scope.
 ```
 for {
   _ <- set(1)
   _ <- pushScopeF
-  _   <- set(42)
+  _   <- add(42)
   a   <- get
   _ <- popScopeF
   b <- get
 } yield (a, b)
-// returns (42, 1)
+// returns (43, 1)
 ```
 
 ### Mutable Variables
@@ -125,7 +131,7 @@ for {
 ```
 
 ### Goto
-What kind of control flow would we have without goto? This is just for fun, I don't recommend you use this.
+What kind of control flow would we have without goto? This is just for fun, I don't recommend you use this (really this goes for the entire project, but more so goto).
 ```
 for {
   _ <- set(100)
