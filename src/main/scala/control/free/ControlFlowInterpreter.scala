@@ -9,7 +9,7 @@ import ControlFlowA._
   * Created by rtitle on 7/15/17.
   */
 object ControlFlowInterpreter {
-  def apply[F[_], G[_]: Monad, I <: F ~> G](initial: I, copy: I => I): ControlFlowApp[F, ?] ~> G =
+  def apply[F[_], G[_]: Monad, I <: F ~> G](initial: I, copy: I => I = identity _): ControlFlowApp[F, ?] ~> G =
     new ControlFlowInterpreter[F, G, I](initial, copy)
 }
 

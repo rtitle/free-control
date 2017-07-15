@@ -20,7 +20,9 @@ class ControlFlowSpec extends FlatSpec with Matchers {
 
   "ControlFlow" should "support while loops" in {
     val program = for {
-      _ <- whileF(get.map(_ < 100))(add(1))
+      _ <- whileF(get.map(_ < 100)) {
+        add(1)
+      }
       res <- get
     } yield res
 
@@ -48,10 +50,14 @@ class ControlFlowSpec extends FlatSpec with Matchers {
   it should "support conditionals" in {
     val program = for {
       _ <- set(5)
-      res <- condF(get.map(_ < 10) -> constF(100))(otherwise = constF(-1))
+      res <- condF(
+        get.map(_ < 2) -> constF("less than 2"),
+        get.map(_ < 5) -> constF("less than 5"),
+        get.map(_ < 10) -> constF("less than 10"))(
+        otherwise = constF("greater than or equal to 10"))
     } yield res
 
-    program.foldMap(interpreter) should equal (100)
+    program.foldMap(interpreter) should equal ("less than 10")
   }
 
   it should "support partial conditionals" in {
@@ -86,13 +92,13 @@ class ControlFlowSpec extends FlatSpec with Matchers {
     val program = for {
       _ <- set(1)
       _ <- pushScopeF
-      _   <- set(42)
+      _   <- add(42)
       a   <- get
       _ <- popScopeF
       b <- get
     } yield (a, b)
 
-    program.foldMap(interpreter) should equal (42, 1)
+    program.foldMap(interpreter) should equal (43, 1)
   }
 
   it should "support goto" in {
