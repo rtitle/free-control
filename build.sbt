@@ -10,7 +10,8 @@ addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.4")
 
 libraryDependencies ++= Seq(
   "org.typelevel" %% "cats"      % "0.9.0",
-  "org.typelevel" %% "cats-free" % "0.9.0"
+  "org.typelevel" %% "cats-free" % "0.9.0",
+  "org.scalatest" %% "scalatest" % "3.0.3" % "test"
 )
 
 
