@@ -16,7 +16,7 @@ object ControlFlowInterpreter {
 class ControlFlowInterpreter[F[_], G[_], I <: F ~> G] private (initial: I, copy: I => I)(implicit M: Monad[G]) extends (ControlFlowApp[F, ?] ~> G) {
   var stack: List[I] = List(initial)
   var labels: Map[String, FreeControlFlowApp[F, _]] = Map.empty
-  var vars: Map[String, Free[Any, Any]] = Map.empty
+  var vars: Map[String, FreeControlFlowApp[F, _]] = Map.empty
 
   override def apply[A](fa: ControlFlowApp[F, A]): G[A] = {
     fa.run match {
@@ -65,10 +65,10 @@ class ControlFlowInterpreter[F[_], G[_], I <: F ~> G] private (initial: I, copy:
 
           case GetVar(name) =>
             val found = vars.get(name)
-            M.pure(found.map(unsafe(_).foldMap(this)))
+            M.pure(found.map(_.foldMap(this)))
 
           case SetVar(name, value) =>
-            vars = vars + (name -> value)
+            vars = vars + (name -> unsafe(value))
             M.pure(())
 
           case Label(lbl) if !labels.contains(lbl) =>
