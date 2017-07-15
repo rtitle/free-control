@@ -43,7 +43,7 @@ final case object Reset extends CounterA[Unit]
 ```
 Note there is state associated with this algebra: it stores a single `Int` value.
 
-Now let's see what we can do with it.
+Now let's see what we can do with our control flow structures.
 
 ### While loops
 ```
