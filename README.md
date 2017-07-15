@@ -5,7 +5,7 @@
 This project provides control structures for the free monad in Scala. See below for usage and examples.
 
 ## Usage
-The control flow algebra can be composed into an existing free algebra as described in [cats documentation](http://typelevel.org/cats/datatypes/freemonad.html) (see `Composing Free monads ADTs`): 
+The control flow algebra can be composed into an existing free algebra as described in [cats documentation](http://typelevel.org/cats/datatypes/freemonad.html) (see section called `Composing Free monads ADTs`): 
 
 For example, assuming an existing `MyAlgebra` and `MyInterpreter`:
 ```
