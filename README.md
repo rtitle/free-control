@@ -20,6 +20,8 @@ def program(implicit A: MyAlegbra[MyApp], C: ControlFlow[MyApp]): Free[MyApp, ??
 
 // The control flow interpreter wraps the other interpreter(s). This is necessary for implementing some control flow features.
 val interpreter: MyApp ~> Id = ControlFlowInterpreter(MyInterpreter)
+
+// Run it!
 program.foldMap(interpreter)
 
 ```
