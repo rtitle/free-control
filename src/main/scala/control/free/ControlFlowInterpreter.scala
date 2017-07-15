@@ -1,9 +1,9 @@
-package free.control
+package control.free
 
 import cats.data.Coproduct
 import cats.free.Free
 import cats.{Monad, ~>}
-import free.control.ControlFlowA._
+import ControlFlowA._
 
 /**
   * Created by rtitle on 7/15/17.

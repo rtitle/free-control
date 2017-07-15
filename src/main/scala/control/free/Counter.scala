@@ -1,8 +1,8 @@
-package free.control 
+package control.free
 
 import cats.free.{Free, Inject}
 import cats.{Id, ~>}
-import free.control.CounterA._
+import CounterA._
 
 sealed trait CounterA[A]
 

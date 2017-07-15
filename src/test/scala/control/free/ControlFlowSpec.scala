@@ -1,4 +1,4 @@
-package free.control
+package control.free
 
 import cats.{Id, ~>}
 import cats.data.Coproduct

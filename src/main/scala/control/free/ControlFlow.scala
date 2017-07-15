@@ -1,29 +1,29 @@
-package free.control 
+package control.free
 
 import cats.free.{Free, Inject}
 import cats.syntax.either._
-import free.control.ControlFlowA._
+import ControlFlowA._
 
 sealed trait ControlFlowA[A]
 
 object ControlFlowA {
-  private[control] final case object Stay extends ControlFlowA[Unit]
-  private[control] final case class Const[A](a: A) extends ControlFlowA[A]
+  final case object Stay extends ControlFlowA[Unit]
+  final case class Const[A](a: A) extends ControlFlowA[A]
 
-  private[control] final case object PushScope extends ControlFlowA[Unit]
-  private[control] final case object PopScope extends ControlFlowA[Unit]
-  private[control] final case class GetVar[F[_], A](name: String) extends ControlFlowA[Option[A]]
-  private[control] final case class SetVar[F[_], A](name: String, value: Free[F, A]) extends ControlFlowA[Unit]
+  final case object PushScope extends ControlFlowA[Unit]
+  final case object PopScope extends ControlFlowA[Unit]
+  final case class GetVar[F[_], A](name: String) extends ControlFlowA[Option[A]]
+  final case class SetVar[F[_], A](name: String, value: Free[F, A]) extends ControlFlowA[Unit]
 
-  private[control] final case class Label(lbl: String) extends ControlFlowA[Unit]
-  private[control] final case class Goto(lbl: String) extends ControlFlowA[Unit]
+  final case class Label(lbl: String) extends ControlFlowA[Unit]
+  final case class Goto(lbl: String) extends ControlFlowA[Unit]
 
-  private[control] final case class Cond[F[_], A](conds: List[(Free[F, Boolean], Free[F, A])], otherwise: Free[F, A]) extends ControlFlowA[A]
-  private[control] final case class While[F[_], A](cond: Free[F, Boolean], fn: Free[F, A]) extends ControlFlowA[Unit]
-  private[control] final case class RepeatWithIndex[F[_], A](n: Free[F, Int], fn: Int => Free[F, A]) extends ControlFlowA[Unit]
+  final case class Cond[F[_], A](conds: List[(Free[F, Boolean], Free[F, A])], otherwise: Free[F, A]) extends ControlFlowA[A]
+  final case class While[F[_], A](cond: Free[F, Boolean], fn: Free[F, A]) extends ControlFlowA[Unit]
+  final case class RepeatWithIndex[F[_], A](n: Free[F, Int], fn: Int => Free[F, A]) extends ControlFlowA[Unit]
 }
 
-private[control] class ControlFlow[F[_]](implicit I: Inject[ControlFlowA, F]) {
+class ControlFlow[F[_]](implicit I: Inject[ControlFlowA, F]) {
 
   def function0F[A](body: () => Free[F, A]): Free[F, () => Free[F, A]] =
     constF(body)
