@@ -125,4 +125,42 @@ class ControlFlowSpec extends FlatSpec with Matchers {
     program.foldMap(interpreter) should equal (Some(3), Some(5), None)
   }
 
+  it should "run the Sieve of Eratosthenes" in {
+    val sieve = (n: Int) => for {
+      _ <- setVarF("primes", constF(Set.empty ++ (2 to n)))
+      _ <- setVarF("p", constF(2))
+      _ <- whileF(getVarF[Int]("p").map(p => p.get * p.get < n)) {
+        // TODO maybe add a getVarF which doesn't return an Option
+        val primesF = getVarF[Set[Int]]("primes").map(_.get)
+        val pF = getVarF[Int]("p").map(_.get)
+
+        val cond = for {
+          primes <- primesF
+          p <- pF
+        } yield primes.contains(p)
+
+        // TODO desperately needs a for loop construct
+        val innerWhile = for {
+          _ <- setVarF("i", pF.map(_ * 2))
+          _ <- whileF(getVarF[Int]("i").map(_.get <= n)) {
+            val iF = getVarF[Int]("i").map(_.get)
+            for {
+              _ <- setVarF("primes", primesF.flatMap(primes => iF.map(i => primes - i)))
+              _ <- pF.flatMap(p => setVarF("i", iF.map(_ + p)))
+            } yield ()
+          }
+        } yield ()
+
+        for {
+          _ <- partialCondF(cond -> innerWhile)
+          _ <- setVarF("p", pF.map(_ + 1))
+        } yield ()
+      }
+      result <- getVarF[Set[Int]]("primes")
+    } yield result
+
+    // Bombs with a StackOverflowError??
+    sieve(20).foldMap(interpreter) should equal (Set(2,3,5,7,11,13,17,19))
+  }
+
 }
